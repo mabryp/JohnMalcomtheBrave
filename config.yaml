@@ -71,7 +71,7 @@ eMail: #You can use this email if you like.  This is where the email will be sen
 Database:
     file: 'JMTB.db'  #Self explanitory.  Just remember that this file name will need to change if you want to run multiple scripts. 
 
-System:#This section is currently configured to run through the cycle once and then stop.  
+System:               #This section is currently configured to run through the cycle once and then stop.  
     Pause_Duration: 0 #This is in seconds.  Every coin in searchcoins is queried and processed on each cycle.   
     Num_of_Cycles: 0 #The number of cycles to run.  To run just once, set to 1.  
     bind_loop: 1 #1 or 0.  Set to 0 to run cycles indefinately, set to 1 to repat the loop as specified above.  
