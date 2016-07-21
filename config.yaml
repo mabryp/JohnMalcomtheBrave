@@ -1,0 +1,81 @@
+
+#This is the configuration file for JMTB.  
+#To start auto-trading a crypto-pair complete the following steps:
+
+
+# Step One: Add the coin properties.  Below you will see an example of sevearl coins and their properties.  
+# Step Two: Add the coin to SearchCoins list.
+# Step Three:  Set the E-Mail settings
+# Step Four:  Verify database name.  YOu can use default, but change it to run more than one instance. 
+# Step Five: System Settings.  Here you define 
+# Step Six: Add your public and secret keys at the very bottom.  
+
+coin:
+
+    ETH: 
+        period: 240 # Trading time period. In minutes. Allowed values: 5,15,30,120(2hr),240 (4hr),1440(Daily)
+        auth_amt: .5 #This is the ammount, in Bitcoin, you authorize this bot to trade. Here, I authorize the bot to hold up to .5BTC of Ethereum. Used by all trading strats 
+        enable_breakout: 0 #1 True/ 0 False
+        enable_hold_pos: 1 #1 True/ 0 False
+        enable_swing: 0 #1 True/ 0 False - ignore for now.  Testing.
+
+    LTC:
+        period: 30 #Trade on the 30 minute chart.
+        auth_amt: .1   #Authorized .1 BTC to trade with. 
+        enable_breakout: 0 #1 True/ 0 False  
+        enable_hold_pos: 1 #1 True/ 0 False 
+        enable_swing: 0 #1 True/ 0 False - ignore for now.  Testing.
+
+    SC:
+        period: 1440 #Trade on the daily charts.  
+        auth_amt: .03 # .03 Bitcoin worth. 
+        enable_breakout: 1  #1 True / 0 False
+        enable_hold_pos: 0 #1 True/ 0 False 
+        enable_swing: 0 #1 True/ 0 False - ignore for now.  Testing.
+
+    DASH:
+        period: 30
+        auth_amt: .05
+        enable_breakout: 0 #1 True/ 0 False
+        enable_hold_pos: 0 #1 True/ 0 False
+        enable_swing: 1 #1 True/ 0 False - ignore for now.  Testing.
+
+    LSK:
+        period: 30
+        auth_amt: .15
+        enable_breakout: 0 #1 True/ 0 False
+        enable_hold_pos: 1 #1 True/ 0 False 
+        enable_swing: 0  #1 True/ 0 False - ignore for now.  Testing.
+
+    SYS: 
+        period: 240
+        auth_amt: .05
+        enable_breakout: 0 #1 True/ 0 False
+        enable_hold_pos: 1 #1 True/ 0 False  
+        enable_swing: 0 #1 True/ 0 False - ignore for now.  Testing.
+
+searchCoins: #List every coin you want to trade right here in this format.  Remove any you don't want to trade.
+             # It is important to know that if the coin isn't listed here, it will not be traded at all.  
+    - 'ETH'
+    - 'LTC'
+    - 'SC'
+    - 'DASH'
+    - 'LSK'
+    - 'SYS'
+
+eMail: #You can use this email if you like.  This is where the email will be sent from...fill in your address to get updates.
+    uName: 'johnmalcomthebrave@gmail.com'
+    auth:   'DGphmcs1976!(&^'
+    sendTo: 'example@gmail.com' #You must change this.  I will make it optional in the future.  
+
+Database:
+    file: 'JMTB.db'  #Self explanitory.  Just remember that this file name will need to change if you want to run multiple scripts. 
+
+System:#This section is currently configured to run through the cycle once and then stop.  
+    Pause_Duration: 0 #This is in seconds.  Every coin in searchcoins is queried and processed on each cycle.   
+    Num_of_Cycles: 0 #The number of cycles to run.  To run just once, set to 1.  
+    bind_loop: 1 #1 or 0.  Set to 0 to run cycles indefinately, set to 1 to repat the loop as specified above.  
+
+Auth: 
+    key: 'YOUR_PUBLIC_API_KEY'
+    secret: 'YOUR_SECRET_API_KEY'
