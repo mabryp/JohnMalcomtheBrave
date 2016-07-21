@@ -25,6 +25,18 @@ tl;dr: JMTB operates through three primary phases:
 
 JMTB keeps an updated database of all candlestick data for any given asset with any standard Poloniex time-period (5min, 15 min, 30min, 240min, 1440min).  By holding the data locally we can minimize the amount of dataqueries required to keep data in-sync.  JMTB then uses only locally stored data for all calculations and decisions.  Once these calculations and decisions have completed, those states are saved to the database as well.  Finally, the trading execution logic searches the database for all assets which qualify for trading.  With all trades identified, it then executes each trade as directed by the trading logic (again - this is passed thorugh the database).  
 
+The Strategies:
+	Breakout:  The breakout strategy can be enabled by setting "enable_breakout" to 1.  Breakout will buy that coin when/if the current price sets a new 5 period high (Rob suggests a daily period for this).  Breakout will only sell if/when the coin hits its trailing stop (currently hard coded to 4%, will be configurable in the future).
+	
+	Hold:  The hold strategy is enabled by setting "enable_hold" to 1.  Hold will hold 'X"BTC worth of that coin.  It will only buy if/when the valuation of that coin is less than it's given amount.  For example, I set the bot to hold .25BTC of Litecoin.  It reaches out and buys .25BTC worth of litecoin.  Then, the price doesn't move much.  One day, the price of Litecoin plummets - this causes the valuation of LTC to drop below .25 - so the bot will buy more LTC. 
+		
+		Conversely, if the price of LTC rises then the total valuation of LTC held by JMTB will surpass its allotted amount to
+		maintain.  
+		
+		In short: Hold will buy on downtrends to get good bargains; but will sell in stages during uptrends.  
+		
+	Swing:  This strategy is not implemented yet.  Comming soon.... but will try to identify trends and buy into up-trending coin. 
+
 TODO:
 
 -Further segregate buy/sell algorithms to allow for buying on one period and selling on another.  
