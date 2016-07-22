@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jul 21 09:49:40 2016
-Configure JMTB using config.yaml located in the same directory as this file.  
+Created on Fri Jul 08 15:27:34 2016
+Check the readme for more information.  Edit the config.yaml file to configure settings and assets.
 @author: Phill
 """
-
-
+import random
+import json
 import smtplib
 import urllib, urllib2
 import hmac, hashlib
@@ -16,22 +16,30 @@ import sqlite3
 import yaml 
 
 '''-------------------API QUERY Function-------------------------------'''
-def api_query(command, req={}):
+def api_query(command, req={},jsonV=0):
     #All authenticated queries will run through this function
     req['command'] = command
     req['nonce'] = int(time.time()*1000000000)
     post_data = urllib.urlencode(req)
-    print "Query initiated with post code: "+post_data+str(datetime.datetime.utcnow())
+    print "\n\t\tQuery initiated with post code: "+post_data+str(datetime.datetime.utcnow())
     sign = hmac.new(secret, post_data, hashlib.sha512).hexdigest()
     headers = {'Sign': sign,'Key': key}
-    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', post_data, headers))                  
-    jsonRet = pd.read_json(ret, typ='dataframe', dtype=False)
-    return jsonRet
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', post_data, headers))  
+    if jsonV==0:                
+        jsonRet = pd.read_json(ret, typ='dataframe', dtype=False)
+        return jsonRet
+    elif jsonV==1:
+        jsonRet2 = json.load(ret)
+        return jsonRet2
     
 def yaml_loader():    
     with open('config.yaml', "r") as file_descriptor:
         data = yaml.load(file_descriptor)
         return data
+def getmsg():
+    with open('msg.yaml', 'r') as strings:
+        data = yaml.load(strings)
+        return data 
         
 def coinSettings(coin):
     yaml_loader()
@@ -45,10 +53,53 @@ def getPeriod(coin):
 
 
 def banner():
-    print "\n\n"+"*"*200
-    print "\t\t\t\t\t¯\_(ツ)_/¯ - I have no idea what I'm doing"
-    print "*"*200
-
+    num=random.randrange(1,16,1)
+    msg = getmsg()
+    remark= msg['msg']['killroy'][num]
+    try:    
+        print "\n"+"*"*200
+        print "\t\t\t\t\t¯\_(ツ)_/¯ - "+remark
+        print "*"*200
+    except UnicodeDecodeError:
+        print "\n"+"*"*200
+        print "\t\t\t\t\t¯\_(ツ)_/¯ - This is an honest error and I have no idea why!"
+        print "*"*200
+    
+    
+def getTradeHist(pair, period, year=2016,month=1,day=1):
+    begin = datetime.date(year, month, day)
+    start = time.mktime(begin.timetuple())
+    end = time.time()
+    hist = api_query('returnTradeHistory', {'currencyPair':pair, 'start':str(start),'end':str(end)},1)
+    df = pd.DataFrame(hist)
+    if df.empty:
+        return 0
+    elif not df.empty:
+        df.set_index('date',inplace=True)
+        df['rate'] = df.rate.astype(float)
+        df['amount'] = df.amount.astype(float)
+        df['fee'] = df.fee.astype(float)
+        df['total'] = df.total.astype(float)
+        table=str(pair)+str(period)
+        df.to_sql(table+'_trade_hist', conn,if_exists='replace')
+        conn.commit()
+        #print df.head()
+          
+    table = pair+str(period)
+    sqlqry = ('SELECT * FROM %s_trade_hist'%(table))
+    df = pd.read_sql(sqlqry,conn)
+    buydf = df.loc[df.type == 'buy']
+    selldf = df.loc[df.type == 'sell']
+    df.sort('date',ascending=True,inplace=True)
+    print "\n"+"*"*15+"SUMMARY FOR : "+pair
+    print pair+" average price paid: "+str(buydf.rate.mean())
+    print pair+" average sold price: "+str(selldf.rate.mean())
+    print pair+" maximum price paid: "+str(buydf.rate.max())
+    print pair+" maximum price sold: "+str(selldf.rate.max())
+    print pair+" average buy quantity: "+str(buydf.amount.mean())
+    print pair+" average sell quantity: "+str(selldf.amount.mean())
+    print "*"*50   
+    
 def checkUpdate(pair, period):
     coin = pair.replace("BTC_","")
     data = coinSettings(coin)
@@ -70,22 +121,16 @@ def checkUpdate(pair, period):
             data = getChartdata(pair,period)
             data.set_index('date',inplace=True)
             data.to_sql(str(table),conn,if_exists='replace') 
-            return 
-            
+            return
             
     qry ='CREATE TABLE IF NOT EXISTS %s (date NUMERIC UNIQUE, close REAL, high REAL, low REAL, open REAL, quoteVolume REAL, volume REAL, weightedAverage REAL) ' %(pair+str(period))
     c.execute(qry)    
-
     c.execute("UPDATE OR IGNORE current_position SET Auth_BTC_Value = ? WHERE coin = ?",(auth_btc, coin))
-
-    
-                
-               
-    print "\n*Checking Chart Data :"+pair+" with period: "+str(period)
-      
+    print "\n*Checking Chart Data :"+pair+" with period: "+str(period)   
     sqlqry = 'SELECT date from '+pair+str(period)+' ORDER BY date DESC LIMIT 1'   
     c.execute(sqlqry)
     df = c.fetchall()
+    
     if not df:
         print "Local cache for: "+pair+" "+period+": NOT CACHED: Accessing most recent candlestick data.\n"
         Update_Chart_table(pair, period)
@@ -101,8 +146,7 @@ def checkUpdate(pair, period):
             return 1
         else: print "Most recent data cached."
         return 0
-        
-        
+
 def getBTC():
         
     def getBalance(coin):
@@ -123,11 +167,7 @@ def getBTC():
     btc_holding =   float(btc_bal)*float(USD)  
     c.execute("INSERT OR IGNORE INTO current_position (coin) VALUES ('BTC')")  
     c.execute("UPDATE current_position SET price = 1, quantity = ?, USD = ? WHERE coin = 'BTC'",(btc_bal,btc_holding))
-    
-     
-    
    
-    
 def updateCurrent_Position(coin):
     
     
@@ -163,8 +203,8 @@ def updateCurrent_Position(coin):
     usd_val = btc_val * USD
    
     openOrders = returnOpenOrders("BTC_"+coin)
-    #A function which will iterate through the open-orders reply, grab the date and then cancel the order 
-    #if it is over X periods old. Add X as a configurable paramter for each coin.  
+    #Create a simple function which will iterate through the open-orders reply, grab the date and then cancel the order 
+    #if it is over X periods old.  Perhaps this can be configurable - how long do you want to hold open orders? How many orders at once?
     if openOrders:
         orders = 0
         placeHolder = []
@@ -195,7 +235,6 @@ def updateCurrent_Position(coin):
     c.execute('UPDATE current_position SET coin = ?, price = ?, quantity = ? , USD = ?, open_orders = ?, BTC_Val = ? WHERE coin = ?',(coin,last,quantity,usd_val,orders,btc_val,coin))
     
     #c.execute('UPDATE current_position set open_orders = ? WHERE coin = ?',(btc_val,coin))
-    
     conn.commit
     return 1
    
@@ -220,7 +259,6 @@ def setIndicators(pair, period):
     SMA['Highest_High']= SMA['high'].rolling(window=5,center=False).max()
     SMA['Lowest_Low'] = SMA['low'].rolling(window=5,center=False).min()
     SMA.to_sql(pair+'__indicators__'+period, conn, if_exists='replace')
-    
     return 1
     
 def setTrailingStop(pair):
@@ -235,7 +273,7 @@ def setTrailingStop(pair):
             c.execute("UPDATE OR REPLACE current_position SET Trailing_Stop = ? WHERE coin = ?",(new_t_stop, coin))
             print "New Trailing Stop for :"+coin+", "+str(new_t_stop)
         elif old_t_stop > new_t_stop:
-            print "New T_Stop: "+str(new_t_stop)+";  Old T_Stop: "+str(old_t_stop)
+            print "Discarded T_Stop: "+str(new_t_stop)+";  Current T_Stop: "+str(old_t_stop)
             pass
     elif not old_t_stop:
         c.execute("UPDATE OR REPLACE current_position SET Trailing_Stop = ? WHERE coin = ?",(new_t_stop, coin))
@@ -243,8 +281,6 @@ def setTrailingStop(pair):
     conn.commit()
     return 
     
-    
-
 def setTradeBoolean(pair, period):
     
     sqlqry = "SELECT * from "+pair+"__indicators__"+str(period)
@@ -280,15 +316,11 @@ def initiateTradeSequence(coin, period):
         print "Auth_Budget for "+coin+" is None"
         max_trade = 0
         pass
-    
-    
     #Trailing stop checked first.  Will sell all if Trailing_Stop is hit.      
     if current_[0][1] <= current_[0][8]:
         print "Trailing Stop activated for: "+coin+"\n"
         print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
         sell(coin,price,max_sell) 
-        
-        
         
     #Begin Breakout Strategy:    
     if data['coin'][coin]['enable_breakout'] == 1:
@@ -316,13 +348,12 @@ def initiateTradeSequence(coin, period):
             print "\nBreakout for :"+coin
             print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
             buy(coin,price,max_trade)
-            
-           
+
     #Begin Hold Position Strategy:
     elif data['coin'][coin]['enable_hold_pos'] == 1:
-        print "You must create a hold position strategy!"
+        print coin+" is trading on a hold strategy!"
         if (current_[0][4] >= current_[0][3]) & (current_[0][6] <= 1) & (price*min_trade > .001):
-            quant = ((auth_budget - current_[0][3])/price)*.6
+            quant = ((auth_budget - current_[0][3])/price)*.8
             if quant*price >= .001: buy(coin,price,quant)
         elif (current_[0][4] <= current_[0][3]) & (data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] <= 1) & (price*min_trade > .001):
             quant = ((current_[0][3] - auth_budget)/price)*.9
@@ -330,19 +361,14 @@ def initiateTradeSequence(coin, period):
        
     #Begin swing strategy:        
     elif data['coin'][coin]['enable_swing']  == 1:
-        print "\n\t\tYou must create a Swing strategy!\n"
-        
-        
+        print "\n\tYou must create a Swing strategy!\n"
+       
         
 def buy(coin,buy_rate,buy_amnt):
     #This is where the Last_Buy price is added to the current_position table. 
     t_stop = buy_rate*.96
     c.execute("UPDATE OR REPLACE current_position SET Last_Buy = ?, Trailing_Stop = ? WHERE coin = ?", (buy_rate, t_stop, coin))
-    
     buy_Response = api_query('buy',{"currencyPair":"BTC_"+coin,"rate":buy_rate,"amount":buy_amnt})
-    
-    
-
     for entry in buy_Response:
         print entry
         log = open('tradehist.log', 'a')
@@ -359,8 +385,6 @@ def buy(coin,buy_rate,buy_amnt):
 def sell(coin,sell_rate,sell_amnt):
     c.execute("UPDATE current_position SET Last_Sell = ? WHERE coin = ?", (sell_rate, coin))
     sell_Response = api_query('sell',{"currencyPair":"BTC_"+coin,"rate":sell_rate,"amount":sell_amnt})
-    s_response = sell_Response['resultingTrades']
-   
     for entry in sell_Response:
         print entry    
         log = open('tradehist.log.txt', 'a')
@@ -369,7 +393,7 @@ def sell(coin,sell_rate,sell_amnt):
         log.write(str(entry))
         log.write("\n**********\n\n")
         log.close()                
-        content = ("\n\nSold  "+coin+", Quantity: "+str(sell_amnt)+" "+coin+".\n"+str(s_response)+'\n'+str(sell_Response))
+        content = ("\n\nSold  "+coin+", Quantity: "+str(sell_amnt)+" "+coin+'\n'+str(sell_Response))
         sendEmail(content)
         conn.commit() 
         
@@ -405,7 +429,7 @@ c = conn.cursor()
 conn.row_factory = sqlite3.Row 
      
 
-    
+   
 
 
 def main():
@@ -423,9 +447,10 @@ def main():
         setTradeBoolean(pair, period)
         initiateTradeSequence(alt, period)
         updateCurrent_Position(alt)
-        setTrailingStop(pair)               
+        setTrailingStop(pair)     
+        getTradeHist(pair, period)                
         print '\n\n'+"\t\t\t\t\t!!!!!!!!!!"+pair+": "+str(period)+"_Complete!!!!!!!!!!" 
-        print "_"*200 
+
         banner()
     
     return "Full cyle completed at: "+str(datetime.datetime.utcnow())
