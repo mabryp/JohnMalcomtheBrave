@@ -132,7 +132,7 @@ def checkUpdate(pair, period):
     df = c.fetchall()
     
     if not df:
-        print "Local cache for: "+pair+" "+period+": NOT CACHED: Accessing most recent candlestick data.\n"
+        print "Local cache for: "+pair+" "+str(period)+": NOT CACHED: Accessing most recent candlestick data.\n"
         Update_Chart_table(pair, period)
     else:
         candle_stamp = df[0]
@@ -315,6 +315,8 @@ def initiateTradeSequence(coin, period):
     else: 
         print "Auth_Budget for "+coin+" is None"
         max_trade = 0
+        min_trade = 0
+        micro_buy = 0
         pass
     #Trailing stop checked first.  Will sell all if Trailing_Stop is hit.      
     if current_[0][1] <= current_[0][8]:
@@ -332,26 +334,29 @@ def initiateTradeSequence(coin, period):
             #Buy_Small will buy 33% of its alloted ammount when Price hits top BB Band.
             #Micro_Buy will buy 10% of its alloted ammount when price breaks above 20MA and 30MA
             #Max_Buy will buy full alloted amount when price hits new five-day high. 
-        if data_.iloc[-1]['Buy_Small'] & ( current_[0][6] <= 2 ) & (price*min_trade > .001): 
+        if data_.iloc[-1]['Breakout_High'] & (current_[0][6] <= 2):
+            print data_.iloc[-1]
+            print "\nBreakout for :"+coin
+            print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
+            buy(coin,price,max_trade)
+       
+       
+        elif data_.iloc[-1]['Buy_Small'] & ( current_[0][6] <= 2 ) & (price*min_trade > .001): 
             print data_.iloc[-1]
             print "\nBuy Small for "+coin
             print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
             buy(coin,price,min_trade)
             
-        if (data_.iloc[-1]['P_Over_30MA'] & data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] <= 2) & (price*micro_buy > .001):
+        elif (data_.iloc[-1]['P_Over_30MA'] & data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] <= 2) & (price*micro_buy > .001):
             print data_.iloc[-1]
             print "\nMicro-Buy for "+coin
             buy(coin,price,micro_buy)
         
-        elif data_.iloc[-1]['Breakout_High'] & (current_[0][6] <= 2):
-            print data_.iloc[-1]
-            print "\nBreakout for :"+coin
-            print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
-            buy(coin,price,max_trade)
+       
 
     #Begin Hold Position Strategy:
     elif data['coin'][coin]['enable_hold_pos'] == 1:
-        print coin+" is trading on a hold strategy!"
+        print '\t'+coin+" is trading on a hold strategy!"
         if (current_[0][4] >= current_[0][3]) & (current_[0][6] <= 1) & (price*min_trade > .001):
             quant = ((auth_budget - current_[0][3])/price)*.8
             if quant*price >= .001: buy(coin,price,quant)
