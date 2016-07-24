@@ -190,7 +190,7 @@ def updateCurrent_Position(coin):
         return ticker[coin]    
     
     def returnOpenOrders(pair):
-        data = api_query('returnOpenOrders', {"currencyPair":'all'} )
+        data = api_query('returnOpenOrders', {"currencyPair":'all'},1 )
         
         return data[pair]
 
@@ -268,6 +268,11 @@ def setTrailingStop(pair):
     current_price = data[0][1]
     new_t_stop = current_price *.96
     old_t_stop = data[0][8]
+    current_quantity = data[0][2]
+    if current_quantity <= 1:
+        c.execute('UPDATE OR REPLACE current_position SET Trailing_Stop = 0 WHERE coin = ?',(coin,))
+        conn.commit()
+        return 0
     if old_t_stop:     
         if new_t_stop >= old_t_stop*1.02:
             c.execute("UPDATE OR REPLACE current_position SET Trailing_Stop = ? WHERE coin = ?",(new_t_stop, coin))
@@ -279,7 +284,7 @@ def setTrailingStop(pair):
         c.execute("UPDATE OR REPLACE current_position SET Trailing_Stop = ? WHERE coin = ?",(new_t_stop, coin))
         print "New Trailing Stop for :"+coin+", "+str(new_t_stop)
     conn.commit()
-    return 
+    return 1
     
 def setTradeBoolean(pair, period):
     
@@ -334,20 +339,20 @@ def initiateTradeSequence(coin, period):
             #Buy_Small will buy 33% of its alloted ammount when Price hits top BB Band.
             #Micro_Buy will buy 10% of its alloted ammount when price breaks above 20MA and 30MA
             #Max_Buy will buy full alloted amount when price hits new five-day high. 
-        if data_.iloc[-1]['Breakout_High'] & (current_[0][6] <= 2):
+        if data_.iloc[-1]['Breakout_High'] & (current_[0][6] < 1):
             print data_.iloc[-1]
             print "\nBreakout for :"+coin
             print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
             buy(coin,price,max_trade)
        
        
-        elif data_.iloc[-1]['Buy_Small'] & ( current_[0][6] <= 2 ) & (price*min_trade > .001): 
+        elif data_.iloc[-1]['Buy_Small'] & ( current_[0][6] < 1 ) & (price*min_trade > .001): 
             print data_.iloc[-1]
             print "\nBuy Small for "+coin
             print"last_trade: "+str(price)+", quantity_owned: "+str(quantity_owned)+", max_trade: "+str(max_trade)
             buy(coin,price,min_trade)
             
-        elif (data_.iloc[-1]['P_Over_30MA'] & data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] <= 2) & (price*micro_buy > .001):
+        elif (data_.iloc[-1]['P_Over_30MA'] & data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] < 1) & (price*micro_buy > .001):
             print data_.iloc[-1]
             print "\nMicro-Buy for "+coin
             buy(coin,price,micro_buy)
@@ -357,10 +362,12 @@ def initiateTradeSequence(coin, period):
     #Begin Hold Position Strategy:
     elif data['coin'][coin]['enable_hold_pos'] == 1:
         print '\t'+coin+" is trading on a hold strategy!"
-        if (current_[0][4] >= current_[0][3]) & (current_[0][6] <= 1) & (price*min_trade > .001):
+        if (current_[0][4] >= current_[0][3]) & (current_[0][6] < 1) & (price*min_trade > .001):
+            print "\tBuy "+coin+" because BTC_Val is: "+str(current_[0][3])+" and I am authorized: "+str(current_[0][4])+"\n"
             quant = ((auth_budget - current_[0][3])/price)*.8
             if quant*price >= .001: buy(coin,price,quant)
-        elif (current_[0][4] <= current_[0][3]) & (data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] <= 1) & (price*min_trade > .001):
+        elif (current_[0][4] <= current_[0][3]) & (data_.iloc[-1]['P_Over_20MA']) & (current_[0][6] < 1) & (price*min_trade > .001):
+            print "\tBuy "+coin+" because BTC_Val is: "+str(current_[0][3])+" and I am authorized: "+str(current_[0][4])+"\n"
             quant = ((current_[0][3] - auth_budget)/price)*.9
             if quant*price>=.001: sell(coin,price,quant) 
        
@@ -371,6 +378,9 @@ def initiateTradeSequence(coin, period):
         
 def buy(coin,buy_rate,buy_amnt):
     #This is where the Last_Buy price is added to the current_position table. 
+    if buy_rate*buy_amnt < .01:
+        print "Trade discarded locally, trade value must exceed .01BTC."
+        
     t_stop = buy_rate*.96
     c.execute("UPDATE OR REPLACE current_position SET Last_Buy = ?, Trailing_Stop = ? WHERE coin = ?", (buy_rate, t_stop, coin))
     buy_Response = api_query('buy',{"currencyPair":"BTC_"+coin,"rate":buy_rate,"amount":buy_amnt})
@@ -388,7 +398,10 @@ def buy(coin,buy_rate,buy_amnt):
     
         
 def sell(coin,sell_rate,sell_amnt):
-    c.execute("UPDATE current_position SET Last_Sell = ? WHERE coin = ?", (sell_rate, coin))
+    if sell_rate*sell_amnt < .01:
+        print "Trade discarded locally, trade value must exceed .01BTC."        
+        return 0
+    c.execute("UPDATE current_position SET Last_Sell = ?, Trailing_Stop = 0 WHERE coin = ?", (sell_rate, coin))
     sell_Response = api_query('sell',{"currencyPair":"BTC_"+coin,"rate":sell_rate,"amount":sell_amnt})
     for entry in sell_Response:
         print entry    
