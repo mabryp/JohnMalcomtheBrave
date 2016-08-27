@@ -16,7 +16,7 @@ logging.basicConfig(format='%(asctime)s %(message)s',datefmt='%m/%d/%Y %I:%M:%S 
 
 #Start splash screen.      
 start=time.time()
-JMTB.splash()
+#JMTB.splash()
 JMDB.createDatabase()
 JMDB.updateCurrentPos(JMTB.snapshot(JMTB.getTicker(),JMTB.getBalance(),JMTB.returnOpenOrders()))
 for coin in JMTB.searchCoins:JMDB.createTradeTable(coin)
