@@ -42,7 +42,7 @@ def setTrailingStop(coin,period):
     new_ts = round(cpdf.loc[coin]['Price'] * (1-coin_t_stop),9)
     old_ts = cpdf.loc[coin]['Trailing_Stop']
     if not old_ts:old_ts=0
-    if new_ts >= (old_ts*1.02):
+    if new_ts >= (old_ts*1.02):#Add custom TStop here. 
         logging.warning("Update Trailing Stop for {} to {}".format(coin,new_ts))
         cpdf.set_value(coin,'Trailing_Stop',new_ts)
         JMDB.updateTrailingStop(coin,new_ts)
